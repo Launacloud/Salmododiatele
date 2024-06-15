@@ -36,13 +36,11 @@ jobs:
 
     - name: Configure Git
       run: |
-        git config --global user.name 'github-actions'
-        git config --global user.email 'github-actions@github.com'
-
-     - name: Commit and push changes
-      run: |
         git config --global user.name 'GitHub Actions'
         git config --global user.email 'actions@github.com'
+
+    - name: Commit and push changes
+      run: |
         if [[ `git status --porcelain` ]]; then
           git add feed_cache.json
           git commit -m "Update and Commit Feed Cache"
