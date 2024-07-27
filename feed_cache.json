@@ -1,7 +1,7 @@
 {
-    "etag": "W/\"8e4d8578355427f3c67cfab0f06690533e2762b8a59b5f482dbc4f04d9dd1283\"",
+    "etag": "W/\"50e3c4fd265497a704d1a0149accfe39abc3bda10db4d2951350b7b26ba84227\"",
     "modified": "",
-    "last_entry_id": "https://www.bibliaon.com/salmos_89/",
+    "last_entry_id": "https://www.bibliaon.com/salmos_18/",
     "https://www.bibliaon.com/salmos_74/": true,
     "https://www.bibliaon.com/salmos_55/": true,
     "https://www.bibliaon.com/salmos_120/": true,
@@ -50,5 +50,6 @@
     "https://www.bibliaon.com/salmos_115/": true,
     "https://www.bibliaon.com/salmos_5/": true,
     "https://www.bibliaon.com/salmos_133/": true,
-    "https://www.bibliaon.com/salmos_130/": true
+    "https://www.bibliaon.com/salmos_130/": true,
+    "https://www.bibliaon.com/salmos_80/": true
 }
