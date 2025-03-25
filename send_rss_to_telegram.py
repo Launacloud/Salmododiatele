@@ -79,7 +79,6 @@ def send_telegram_message(message):
         if response.status_code != 200:
             raise Exception(f"Error sending message: {response.text}")
 
-# Function to create a feed checker
 def create_feed_checker(feed_url):
     def check_feed():
         cache = load_cache()
@@ -111,9 +110,13 @@ def create_feed_checker(feed_url):
             entry_id = entry.get('id', entry.get('link')).strip()
             print(f"Checking entry ID: {entry_id}")  # Debug: Print entry ID
 
-            # Check if this entry is already processed (by comparing to last_entry_id)
-            if entry_id != cache["last_entry_id"]:
-                new_entries.append(entry)
+            # Stop the script if the entry ID matches the last processed entry ID
+            if entry_id == cache["last_entry_id"]:
+                print(f"Entry ID {entry_id} matches the last processed entry ID. Stopping script.")
+                break  # This will stop the script and no more entries will be processed
+
+            # Otherwise, add the entry to the list of new entries
+            new_entries.append(entry)
 
         if not new_entries:
             print("No new entries to process.")
