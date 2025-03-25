@@ -16,154 +16,136 @@ if not TELEGRAM_BOT_TOKEN or not RSS_FEED_URL or not CHAT_ID:
 # Cache file path
 CACHE_FILE_PATH = 'feed_cache.json'
 
-# Flag to bypass the etag and last-modified check for debugging
-BYPASS_CACHE_CHECK = True  # Set this to False to enable the cache checks (True)
+# Flag to bypass etag/modified caching (Set to False for production)
+BYPASS_CACHE_CHECK = False  # Change to True to disable caching
 
-# Function to load cache from the file
+# Function to load cache from file
 def load_cache():
     if os.path.exists(CACHE_FILE_PATH):
         try:
             with open(CACHE_FILE_PATH, 'r') as file:
                 cache = json.load(file)
-                print(f"Cache loaded from file: {CACHE_FILE_PATH}")
-                print("Cache content:", cache)  # Debug: Print cache contents
+                print(f"✅ Cache loaded: {cache}")
                 return cache
         except json.JSONDecodeError:
-            print("Invalid JSON in cache file. Starting with an empty cache.")
-            return {"etag": "", "modified": "", "last_entry_id": ""}
-    else:
-        print("No cache file found. Starting with an empty cache.")
-        return {"etag": "", "modified": "", "last_entry_id": ""}
+            print("⚠️ Invalid JSON in cache file. Resetting cache.")
+    return {"etag": "", "modified": "", "last_entry_id": ""}
 
-# Function to save cache to the file
+# Function to save cache to file
 def save_cache(cache):
     with open(CACHE_FILE_PATH, 'w') as file:
         json.dump(cache, file, indent=4)
-    print(f"Cache saved to file: {CACHE_FILE_PATH}")
-    print("Saved cache:", cache)  # Debug: Print saved cache content
+    print(f"✅ Cache saved: {cache}")
 
-# Function to send a message to a Telegram chat
+# Function to send a message to Telegram
 def send_telegram_message(message):
-    # Telegram's maximum message length is 4096 characters
-    MAX_MESSAGE_LENGTH = 4096
-    
-    # Split the message if it exceeds the maximum length
+    MAX_MESSAGE_LENGTH = 4096  # Telegram max message length
+
     if len(message) > MAX_MESSAGE_LENGTH:
-        print(f"Message is too long ({len(message)} characters). Splitting into smaller messages.")
+        print("⚠️ Message too long, splitting...")
         for i in range(0, len(message), MAX_MESSAGE_LENGTH):
-            message_chunk = message[i:i+MAX_MESSAGE_LENGTH]
-            response = requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-                data={
-                    'chat_id': CHAT_ID,
-                    'text': message_chunk,
-                    'parse_mode': 'HTML',
-                    'disable_web_page_preview': 'false'
-                }
-            )
-            print(f"Response status code for chunk: {response.status_code}")
-            print(f"Response text for chunk: {response.text}")
-            if response.status_code != 200:
-                raise Exception(f"Error sending message chunk: {response.text}")
-    else:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        payload = {
-            'chat_id': CHAT_ID,
-            'text': message,
-            'parse_mode': 'HTML',
-            'disable_web_page_preview': 'false'  # Enable link previews
-        }
-        response = requests.post(url, data=payload)
-        print(f"Response status code: {response.status_code}")
-        print(f"Response text: {response.text}")
-        if response.status_code != 200:
-            raise Exception(f"Error sending message: {response.text}")
+            send_telegram_message(message[i:i+MAX_MESSAGE_LENGTH])
+        return
 
-def create_feed_checker(feed_url):
-    def check_feed():
-        cache = load_cache()
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        'chat_id': CHAT_ID,
+        'text': message,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': 'false'
+    }
+    
+    response = requests.post(url, data=payload)
+    if response.status_code != 200:
+        print(f"❌ Telegram Error: {response.text}")
+        raise Exception(f"Error sending message: {response.text}")
 
-        headers = {}
+# Function to check and process the RSS feed
+def check_feed():
+    cache = load_cache()
+    headers = {}
 
-        # Check if we should bypass the cache check for debugging
-        if not BYPASS_CACHE_CHECK:
-            if cache["etag"]:
-                headers['If-None-Match'] = cache["etag"]
-            if cache["modified"]:
-                headers['If-Modified-Since'] = cache["modified"]
+    # Only use etag and last-modified headers if bypass is OFF
+    if not BYPASS_CACHE_CHECK:
+        if cache.get("etag"):
+            headers['If-None-Match'] = cache["etag"]
+        if cache.get("modified"):
+            headers['If-Modified-Since'] = cache["modified"]
 
-        response = requests.get(feed_url, headers=headers)
-        if response.status_code == 304:
-            print("Feed not modified since last check.")
-            return
+    print(f"📡 Fetching feed: {RSS_FEED_URL}")
+    print(f"📤 Sent Headers: {headers}")
 
-        feed = feedparser.parse(response.content)
-        print("Feed parsed successfully.")  # Debug: Feed parsing status
+    response = requests.get(RSS_FEED_URL, headers=headers, allow_redirects=True)
 
-        if 'etag' in response.headers:
-            cache["etag"] = response.headers['etag']
-        if 'last-modified' in response.headers:
-            cache["modified"] = response.headers['last-modified']
+    # If feed is not modified, stop processing
+    if response.status_code == 304:
+        print("✅ Feed not modified, stopping.")
+        return
 
-        new_entries = []
-        for entry in feed.entries:
-            entry_id = entry.get('id', entry.get('link')).strip()
-            print(f"Checking entry ID: {entry_id}")  # Debug: Print entry ID
+    # Debugging: Print headers received
+    print(f"📥 Response Headers: {response.headers}")
 
-            # Stop the script if the entry ID matches the last processed entry ID
-            if entry_id == cache["last_entry_id"]:
-                print(f"Entry ID {entry_id} matches the last processed entry ID. Stopping script.")
-                break  # This will stop the script and no more entries will be processed
+    feed = feedparser.parse(response.content)
 
-            # Otherwise, add the entry to the list of new entries
-            new_entries.append(entry)
+    # Save new etag and last-modified values
+    cache["etag"] = response.headers.get("etag", "")
+    cache["modified"] = response.headers.get("last-modified", "")
 
-        if not new_entries:
-            print("No new entries to process.")
-            return
+    new_entries = []
+    for entry in feed.entries:
+        entry_id = entry.get('id', entry.get('link')).strip()
+        print(f"🔍 Checking entry ID: {entry_id}")
 
-        for entry in reversed(new_entries):  # Process new entries in reverse order
-            entry_id = entry.get('id', entry.get('link')).strip()
+        # Stop processing if we reach an already processed entry
+        if entry_id == cache["last_entry_id"]:
+            print(f"⏹️ Entry ID {entry_id} matches last processed entry. Stopping script.")
+            break
 
-            title = entry.title
-            link = entry.get('link', entry.get('url'))
-            description = entry.get('content_html', entry.get('description'))
+        new_entries.append(entry)
 
-            if description:
-                soup = BeautifulSoup(description, 'html.parser')
-                supported_tags = ['b', 'i', 'a']
-                for tag in soup.find_all():
-                    if tag.name not in supported_tags:
-                        tag.decompose()
-                description_text = soup.prettify()
-            else:
-                description_text = "No description available."
+    if not new_entries:
+        print("ℹ️ No new entries found.")
+        return
 
-            message = f"<b>{title}</b>\n<a href='{link}'>{link}</a>\n\n{description_text}"
+    for entry in reversed(new_entries):  # Process in chronological order
+        entry_id = entry.get('id', entry.get('link')).strip()
 
-            try:
-                print(f"Sending message: {message}")  # Debug: Print message content
-                send_telegram_message(message)
-                cache[entry_id] = True  # Mark entry as processed in cache
-                save_cache(cache)
-            except Exception as e:
-                print(f"Error: {e}")
+        title = entry.title
+        link = entry.get('link', entry.get('url'))
+        description = entry.get('content_html', entry.get('description'))
 
-        # Update the last processed entry ID after all entries are processed
-        if new_entries:
-            last_entry = new_entries[-1]
-            cache["last_entry_id"] = last_entry.get('id', last_entry.get('link')).strip()
-            save_cache(cache)
+        # Clean description
+        if description:
+            soup = BeautifulSoup(description, 'html.parser')
+            allowed_tags = ['b', 'i', 'a']
+            for tag in soup.find_all():
+                if tag.name not in allowed_tags:
+                    tag.decompose()
+            description_text = soup.prettify()
+        else:
+            description_text = "No description available."
 
-    return check_feed
+        message = f"<b>{title}</b>\n<a href='{link}'>{link}</a>\n\n{description_text}"
+
+        try:
+            print(f"📨 Sending: {message[:100]}...")  # Show only first 100 chars
+            send_telegram_message(message)
+            cache[entry_id] = True
+        except Exception as e:
+            print(f"❌ Error sending message: {e}")
+
+    # Update last processed entry ID
+    if new_entries:
+        cache["last_entry_id"] = new_entries[-1].get('id', new_entries[-1].get('link')).strip()
+        save_cache(cache)
 
 # Main function
 def main():
     try:
-        check_feed = create_feed_checker(RSS_FEED_URL)
         check_feed()
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"🚨 Unexpected error: {e}")
 
 if __name__ == "__main__":
     main()
+0
