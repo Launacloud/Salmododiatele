@@ -1,7 +1,7 @@
 {
-    "etag": "W/\"b38904ccf6543b5660f17a79c4045abedbf8cceb9eb845d53d99cc7e5d3b1fc9\"",
+    "etag": "W/\"9c7b3cc0769df21f47edeb3adedd56d3f7090f0f8a3579288cdd5121e6f16b6d\"",
     "modified": "",
-    "last_entry_id": "948e1c8b4cd4e643699c87a58ab0ea6c",
+    "last_entry_id": "72d02b08d54e5be369d917261872f13c",
     "https://www.bibliaon.com/salmos_74/": true,
     "https://www.bibliaon.com/salmos_55/": true,
     "https://www.bibliaon.com/salmos_120/": true,
@@ -230,5 +230,7 @@
     "c47929243835a03338c3dad8678b58b6": true,
     "55cf3da6e8cae97ccf3b295406df8fc3": true,
     "01264067e53eb9a2e82de4a249ea541d": true,
-    "948e1c8b4cd4e643699c87a58ab0ea6c": true
+    "948e1c8b4cd4e643699c87a58ab0ea6c": true,
+    "72d02b08d54e5be369d917261872f13c": true,
+    "e90db1e679b8da38f6cf84c91efa3027": true
 }
